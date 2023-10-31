@@ -1,0 +1,17 @@
+
+plot 'ShortestLongest.plot' using 1:2 with linespoints pt 1 title "Shortest Longest" 
+replot 'FirstFit.plot' using 1:2 with linespoints  pt 2 title "First Fit" 
+replot 'MetaOffset.plot' using 1:2 with linespoints pt 3  title "Meta Offset" 
+replot 'RandomOffset.plot' using 1:2 with linespoints pt 4  title "Greedy Uniform" 
+replot 'CompactPairs.plot' using 1:2  with linespoints pt 6 lc 0 title "Compact Pairs"
+replot 'CompactFit.plot' using 1:2 with linespoints pt 8 title "Compact Fit"  
+set term postscript color solid
+set notitle
+set xrange [0.5:1]
+set xlabel "Load" 
+set key bottom left 
+set ylabel "Success rate (%)"
+set output '| ps2pdf - routestau.pdf'
+replot
+
+
