@@ -1,4 +1,7 @@
 # GuiraudStrozecki2023Scheduling
+
+The code computing the ni's mentioned in section 3.4 is in file load_bound.c.
+
 The two folders correspond to the experiment of the sections 6.1 and 6.1 of the paper "Scheduling periodic messages on a shared link".
 
 You need to have gcc and python3 installed on your OS.

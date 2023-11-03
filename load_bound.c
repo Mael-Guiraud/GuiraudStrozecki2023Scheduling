@@ -39,7 +39,7 @@ int main(int argc, char **argv){
 	for(int i = 1; i<= k; i++){
 		res += message_number[i];
 	}
-	printf("Résultat pour des %d-uples: %f \n ",k,res);
+	printf("Results for %d-uples: %f \n ",k,res);
 	for (int i = 1; i<=k; i++) printf("%f ",message_number[i]);
 	return 0;
 }
