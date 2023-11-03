@@ -11,11 +11,12 @@ All rights reserved.
 
 #include<sys/time.h>
 
-#define PERIODE 10
+#define PERIODE 100
 #define NB_ROUTES 100
-#define TAILLE_ROUTES 10
-#define NB_SIMUL 10000
-
+#define TAILLE_ROUTES 100
+#define NB_SIMUL 1000
+#define EXACT_RESOLUTION 0 //Set to 1 to run the FPT algorithm
+#define FIG18 1 // set to 1 if you want to recreate the file time.data for figure 18
 #define DEBUG 0
 
 double time_diff(struct timeval tv1, struct timeval tv2)
@@ -241,7 +242,7 @@ int first_fit(entree e, int route_courante){
 }
 
 
-int profit(entree e, int route_courante){
+int potential(entree e, int route_courante){
 
 	int max_profit = -1;
 	int max_pos = -1;
@@ -293,8 +294,8 @@ int greedy_first_fit(entree e){
 	return greedy(e, first_fit);
 }
 
-int greedy_profit(entree e){
-	return greedy(e,profit);
+int greedy_potential(entree e){
+	return greedy(e,potential);
 }
 
 //Pour évaluer le profit correctement, il faut gérer les répétitons,
@@ -730,42 +731,51 @@ float statistique(int periode, int nb_routes, int taille_max, int nb_simul, int 
 		fprintf(stdout,"\r%d/%d",i+1,NB_SIMUL);
 		fflush(stdout);
 	}
-	printf("Algo %s: %f réussite\n",name, (double)success/(double)nb_simul);
+	//printf("Algo %s: %f réussite\n",name, (double)success/(double)nb_simul);
 	float return_value = (double)success/(double)nb_simul;
 	free(e.aller); free(e.retour); free(e.decalages);
 	return return_value;
 }
 
 
-void print_gnuplot(char ** algos, int nb_algos)
+void print_python(char ** algos, int nb_algos)
 {
 
 	char buf[64];
-	sprintf(buf,"success.gplt");
+	sprintf(buf,"plot.py");
 	FILE* f_GPLT = fopen(buf,"w");
 	
-	if(!f_GPLT){perror("Opening gplt file failure\n");exit(2);}
+	if(!f_GPLT){perror("Opening python file failure\n");exit(2);}
 
+	fprintf(f_GPLT,"import matplotlib.pyplot as plt \nimport numpy as np\nfilenames = [");
 	for(int i=0;i<nb_algos;i++)
 	{
-		if(i>0)
-		{
-			fprintf(f_GPLT,"re");
-		}	
-		fprintf(f_GPLT,"plot '%s.plot' using 1:2 with lines title \"%s\" \n",algos[i],algos[i]);
+		if(i<nb_algos-1)
+			fprintf(f_GPLT,"'%s.data',",algos[i]);
+		else
+			fprintf(f_GPLT,"'%s.data']\n",algos[i]);
+
 	}
+	fprintf(f_GPLT,"labels = [");
+	for(int i=0;i<nb_algos;i++)
+	{
+		if(i<nb_algos-1)
+			fprintf(f_GPLT,"'%s',",algos[i]);
+		else
+			fprintf(f_GPLT,"'%s']\n",algos[i]);
 
-	
-	fprintf(f_GPLT,"set term postscript color solid\n"
-
-	//"set title \"Performance of different algorithms for PAZL tau = %d , P = %d , nbroutes = %d\"\n"
-		"set notitle\n"
-	"set xlabel \"Load\" \n"
-	//"set xtics 10\n" 
-
-	"set key bottom left \n"
-	"set ylabel \"Success rate(%%)\"\n"
-	"set output '| ps2pdf - success_tau1.pdf'\nreplot\n");
+	}
+	fprintf(f_GPLT,"fig, ax = plt.subplots()\n");
+	fprintf(f_GPLT,"for filename, label in zip(filenames, labels):\n");
+	fprintf(f_GPLT,"\tdata = np.loadtxt(filename, usecols=(0, 1), unpack=True)\n");
+	fprintf(f_GPLT,"\tx, y = data[0], data[1]\n");
+	fprintf(f_GPLT,"\tax.plot(x, y, label=label)\n");
+	fprintf(f_GPLT,"ax.set_xlabel(\"Load\")\n");
+	fprintf(f_GPLT,"ax.set_ylabel(\"Success rate (%%)\")\n");
+	fprintf(f_GPLT,"ax.legend(loc=\"lower left\")\n");
+	fprintf(f_GPLT,"plt.xlim(0.5, 1)\n");
+	fprintf(f_GPLT,"plt.savefig('result.pdf', format='pdf')\n");
+   
 	fclose(f_GPLT);
 	
 
@@ -776,65 +786,59 @@ int main()
 	int seed = time(NULL); 
 	printf("Paramètres :\n -Periode %d\n-Nombre de routes %d\n-Taille maximum des routes %d\n-Nombre de simulations %d\n",PERIODE,NB_ROUTES,TAILLE_ROUTES,NB_SIMUL);
 		//Toujours mettre exhaustivesearch en derniere
-	int nb_algos = 7;
+	int nb_algos = 4;
+	if(EXACT_RESOLUTION)
+		nb_algos++;
 	struct timeval tv1, tv2;
 	float running_time[nb_algos];
-	char * noms[] = {"GreedyUniform","Theoric","FirstFit","Profit","Swap and Move","ShortestLongest","ExhaustiveSearch"};
+	char * noms[] = {"Greedy Uniform","FirstFit","Greedy Potential","Swap and Move","Exact Resolution"};
 	char buf[256];
 	FILE * f[nb_algos];
-	FILE * time = fopen("time.plot","w");
+	FILE * time = fopen("time.data","w");
 	for(int i=0;i<nb_algos;i++)
 	{
-		sprintf(buf,"%s.plot",noms[i]);
+		sprintf(buf,"%s.data",noms[i]);
 		printf("Opening %s ...",buf);
 		f[i] = fopen(buf,"w");
 		if(!f[i])perror("Error while opening file\n");
 		printf("OK\n");
 		running_time[i]=0.0;
 	}
-	float success = 0.0;
-	for(int i=5;i<=NB_ROUTES;i++)
+	int nb_routes_start = FIG18?5:NB_ROUTES;
+	for(int i=nb_routes_start;i<=NB_ROUTES;i++)
 	{
 		for(int j=0;j<nb_algos;j++)
 		{
 			running_time[j]=0.0;
 		}
-		printf("%d Routes \n",i);
+		printf("\n %d Routes \n",i);
 		gettimeofday (&tv1, NULL);	
-		fprintf(f[0],"%f %f\n",i/(float)NB_ROUTES,statistique(PERIODE,i, TAILLE_ROUTES,NB_SIMUL,seed,greedy_uniform,"GreedyUniform")); //ça n'est pas sur les memes entrees a cause du rand
+		fprintf(f[0],"%f %f\n",i/(float)NB_ROUTES,statistique(PERIODE,i, TAILLE_ROUTES,NB_SIMUL,seed,greedy_uniform,"Greedy Uniform")); //ça n'est pas sur les memes entrees a cause du rand
 		gettimeofday (&tv2, NULL);	
 		running_time[0] += time_diff(tv1,tv2);
 		gettimeofday (&tv1, NULL);	
-		fprintf(f[1],"%f %f\n",i/(float)NB_ROUTES,prob_theo(i, TAILLE_ROUTES));
+		fprintf(f[1],"%f %f\n",i/(float)NB_ROUTES,statistique(PERIODE,i, TAILLE_ROUTES,NB_SIMUL,seed,greedy_first_fit,"First Fit"));
 		gettimeofday (&tv2, NULL);	
 		running_time[1] += time_diff(tv1,tv2);
 		gettimeofday (&tv1, NULL);	
-		fprintf(f[2],"%f %f\n",i/(float)NB_ROUTES,statistique(PERIODE,i, TAILLE_ROUTES,NB_SIMUL,seed,greedy_first_fit,"FirstFit"));
+		fprintf(f[2],"%f %f\n",i/(float)NB_ROUTES,statistique(PERIODE,i, TAILLE_ROUTES,NB_SIMUL,seed,greedy_potential,"Greedy Potential"));
 		gettimeofday (&tv2, NULL);	
 		running_time[2] += time_diff(tv1,tv2);
-		gettimeofday (&tv1, NULL);	
-		fprintf(f[3],"%f %f\n",i/(float)NB_ROUTES,statistique(PERIODE,i, TAILLE_ROUTES,NB_SIMUL,seed,greedy_profit,"Profit"));
-		gettimeofday (&tv2, NULL);	
-		running_time[3] += time_diff(tv1,tv2);
 		//statistique(PERIODE,NB_ROUTES, PERIODE,NB_SIMUL,seed,greedy_advanced,"advanced_profit");
 		//algo bugué, ne marche pas pour 50%
 		gettimeofday (&tv1, NULL);	
-		fprintf(f[4],"%f %f \n",i/(float)NB_ROUTES,statistique(PERIODE,i, TAILLE_ROUTES,NB_SIMUL,seed,swap,"Swap and Move"));
+		fprintf(f[3],"%f %f \n",i/(float)NB_ROUTES,statistique(PERIODE,i, TAILLE_ROUTES,NB_SIMUL,seed,swap,"Swap and Move"));
 		gettimeofday (&tv2, NULL);	
-		running_time[4] += time_diff(tv1,tv2);
-		gettimeofday (&tv1, NULL);	
-		fprintf(f[5],"%f %f \n",i/(float)NB_ROUTES,statistique(PERIODE,i, TAILLE_ROUTES,NB_SIMUL,seed,shortestlongest,"ShortestLongest"));
-		gettimeofday (&tv2, NULL);	
-		running_time[5] += time_diff(tv1,tv2);
+		running_time[3] += time_diff(tv1,tv2);
 		fprintf(time,"%d ",i);
 		for(int i=0;i<nb_algos;i++)
 		{
-			printf("Temps d'execution %s = %f \n",noms[i],running_time[i]/NB_SIMUL);
+			//printf("Temps d'execution %s = %f \n",noms[i],running_time[i]/NB_SIMUL);
 			fprintf(time,"%f ",running_time[i]);
 		}
 		fprintf(time,"\n");
-
-		fprintf(f[6],"%f %f \n",i/(float)NB_ROUTES,statistique(PERIODE,i, PERIODE,NB_SIMUL,seed,recsearch,"ExhaustiveSearch"));
+		if(EXACT_RESOLUTION)
+			fprintf(f[4],"%f %f \n",i/(float)NB_ROUTES,statistique(PERIODE,i, PERIODE,NB_SIMUL,seed,recsearch,"Exact Resolution"));
 	}
 	for(int i=0;i<nb_algos;i++)
 	{
@@ -842,6 +846,6 @@ int main()
 		fclose(f[i]);
 	}
 	fclose(time); 
-	print_gnuplot( noms,  nb_algos);
+	print_python(noms,nb_algos);
 	return 0;
 }

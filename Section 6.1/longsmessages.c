@@ -12,12 +12,12 @@ All rights reserved.
 #include <limits.h>
 #include<sys/time.h>
 #include <omp.h>
-#define MESSAGE_SIZE 2500
+#define MESSAGE_SIZE 1000
 #define PERIOD 10000
-#define ROUTES_SIZE_MAX 1400
+#define DELAY_MAX 10000
 #define NB_SIMULS 10000
 #define PARALLEL 1
-#define EXACT_RESOLUTION 0
+#define EXACT_RESOLUTION 1
 double time_diff(struct timeval tv1, struct timeval tv2)
 {
     return (((double)tv2.tv_sec*(double)1000 +(double)tv2.tv_usec/(double)1000) - ((double)tv1.tv_sec*(double)1000 + (double)tv1.tv_usec/(double)1000));
@@ -1036,35 +1036,42 @@ int pair(int *graph,int nb_routes,int period,int message_size)
 	return nb_routes_ok;
 }
 
-void print_gnuplot(char ** algos, int nb_algos,int period, int tau,int nb_messages)
+void print_python(char ** algos, int nb_algos)
 {
 
 	char buf[64];
-	sprintf(buf,"success.gplt");
+	sprintf(buf,"plot.py");
 	FILE* f_GPLT = fopen(buf,"w");
 	
-	if(!f_GPLT){perror("Opening gplt file failure\n");exit(2);}
+	if(!f_GPLT){perror("Opening python file failure\n");exit(2);}
 
+	fprintf(f_GPLT,"import matplotlib.pyplot as plt \nimport numpy as np\nfilenames = [");
 	for(int i=0;i<nb_algos;i++)
 	{
-		if(i>0)
-		{
-			fprintf(f_GPLT,"re");
-		}	
-		fprintf(f_GPLT,"plot '%s.plot' using 1:2 with lines title \"%s\" \n",algos[i],algos[i]);
+		if(i<nb_algos-1)
+			fprintf(f_GPLT,"'%s.data',",algos[i]);
+		else
+			fprintf(f_GPLT,"'%s.data']\n",algos[i]);
+
 	}
+	fprintf(f_GPLT,"labels = [");
+	for(int i=0;i<nb_algos;i++)
+	{
+		if(i<nb_algos-1)
+			fprintf(f_GPLT,"'%s',",algos[i]);
+		else
+			fprintf(f_GPLT,"'%s']\n",algos[i]);
 
-	
-	fprintf(f_GPLT,"set term postscript color solid\n"
-
-	//"set title \"Performance of different algorithms for PAZL tau = %d , P = %d , nbroutes = %d\"\n"
-		"set notitle\n"
-	"set xlabel \"Load\" \n"
-	//"set xtics 10\n" 
-
-	"set key bottom left \n"
-	"set ylabel \"Success rate (%%)\"\n"
-	"set output '| ps2pdf - success_period%d_tau%d_nb-mess_%d.pdf'\nreplot\n",period,tau,nb_messages);
+	}
+	fprintf(f_GPLT,"fig, ax = plt.subplots()\n");
+	fprintf(f_GPLT,"for filename, label in zip(filenames, labels):\n");
+	fprintf(f_GPLT,"\tdata = np.loadtxt(filename, usecols=(0, 1), unpack=True)\n");
+	fprintf(f_GPLT,"\tx, y = data[0], data[1]\n");
+	fprintf(f_GPLT,"\tax.plot(x, y, label=label)\n");
+	fprintf(f_GPLT,"ax.set_xlabel(\"Load\")\n");
+	fprintf(f_GPLT,"ax.set_ylabel(\"Success rate (%%)\")\n");
+	fprintf(f_GPLT,"ax.legend(loc=\"lower left\")\n");
+	fprintf(f_GPLT,"plt.savefig('result.pdf', format='pdf')\n");   
 	fclose(f_GPLT);
 	
 
@@ -1262,8 +1269,8 @@ int main(int argc,char * argv[])
 	int nb_simuls = NB_SIMULS;
 	int message_size = MESSAGE_SIZE;
 	
-	int nb_routes = 8;
-	int size_route = ROUTES_SIZE_MAX;
+	
+	int size_route = DELAY_MAX;
 	srand(time(NULL));
 	struct timeval tv1, tv2;
 	int nb_algos = 5;
@@ -1274,23 +1281,21 @@ int main(int argc,char * argv[])
 		//Toujours mettre exhaustivesearch en derniere
 	char * noms[] = {"FirstFit","MetaOffset","GreedyUniform","CompactPairs","CompactFit","ExactResolution"};
 	char buf[256];
-	FILE * F = fopen("results_echec_short8.data","w");
+	FILE ** f = malloc(sizeof(FILE*)*nb_algos);
 	float success[nb_algos];
-	for(int i=1;i<nb_algos;i++)
+	for(int i=0;i<nb_algos;i++)
 	{
-		//sprintf(buf,"%s.plot",noms[i]);
-		//printf("Opening %s ...",buf);
-		//f[i] = fopen(buf,"w");
-		//if(!f[i])perror("Error while opening file\n");
+		sprintf(buf,"%s.data",noms[i]);
+		printf("Opening %s ...",buf);
+		f[i] = fopen(buf,"w");
+		if(!f[i])perror("Error while opening file\n");
 		success[i]=0.0;
-		//printf("OK\n");
+		printf("OK\n");
 		running_time[i] = 0.0;
 	}
-
-	for(int period = message_size*nb_routes ; period<=message_size*nb_routes/0.4;period+=(message_size*nb_routes/0.4 - message_size*nb_routes )*0.0083)
+	int period = PERIOD;
+	for(int nb_routes = (period/message_size)*0.5 ; nb_routes<=period/message_size;nb_routes+=1)
 	{
-		
-
 		for(int algo=0;algo<nb_algos;algo++)
 		{
 			success[algo]= 0.0;
@@ -1299,7 +1304,7 @@ int main(int argc,char * argv[])
 		#pragma omp parallel for private(graph,tmp)  if (PARALLEL)
 		for(int j=0;j<nb_simuls;j++)
 		{
-			fprintf(stdout,"\r Computing period %d :  %d/%d",period,j+1,nb_simuls);fflush(stdout);
+			fprintf(stdout,"\r Computing load %f :  %d/%d",(float)nb_routes*message_size/period,j+1,nb_simuls);fflush(stdout);
 			graph = random_graph(nb_routes,size_route);
 			pair(graph,nb_routes,period,message_size);
 				
@@ -1350,16 +1355,19 @@ int main(int argc,char * argv[])
 			free(graph);
 			
 		}
-		fprintf(F, "%f ",((float)message_size*nb_routes)/period);
+		
 		for(int algo = 0;algo<nb_algos;algo++)
 		{
-			 fprintf(F,"%f ",success[algo]/nb_simuls *100);
+			fprintf(f[algo], "%f ",((float)message_size*nb_routes)/period);
+			fprintf(f[algo],"%f ",success[algo]/nb_simuls *100);
+			fprintf(f[algo],"\n");
 			
 		}
-		fprintf(F,"\n");
+		
 	}
-	fclose(F);
-	//print_gnuplot( noms,  nb_algos,period, message_size,nb_routes);
+	for(int algo = 0;algo<nb_algos;algo++)fclose(f[algo]);
+	print_python( noms,  nb_algos);
+	free(f);
 	return 0;
 	
 }

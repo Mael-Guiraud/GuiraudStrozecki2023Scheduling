@@ -1,15 +1,18 @@
 run: compile 
-	./test
-	gnuplot success.gplt
+	./greedyRandStar 
+	python3 plot.py
 
 compile: greedyRandStar.c
-	gcc -o test -O2 -Wall greedyRandStar.c 
+	gcc -o greedyRandStar -O2 -Wall greedyRandStar.c 
 
-valgrind: 
+valgrind:
 	gcc -o test -g -Wall greedyRandStar.c 
-	valgrind ./test
+	valgrind ./greedyRandStar
 	
 clean:
-	rm -f test
+	rm -f greedyRandStar
+	rm -f *.data
+	rm -f *.pdf
+	rm -f plot.py
 
 

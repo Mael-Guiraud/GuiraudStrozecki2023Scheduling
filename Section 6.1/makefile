@@ -6,7 +6,7 @@ else
 endif
 
 
-all: compil run gnuplot
+all: compil run plot
 
 
 compil:
@@ -15,5 +15,5 @@ compil:
 run: longsmess
 	./longsmess
 
-gnuplot: success.gplt
-	gnuplot success.gplt
+plot: plot.py
+	python3 plot.py
