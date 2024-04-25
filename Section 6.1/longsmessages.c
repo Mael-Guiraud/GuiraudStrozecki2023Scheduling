@@ -13,11 +13,11 @@ All rights reserved.
 #include<sys/time.h>
 #include <omp.h>
 #define MESSAGE_SIZE 1000
-#define PERIOD 10000
-#define DELAY_MAX 10000
+#define PERIOD 100000
+#define DELAY_MAX 1000
 #define NB_SIMULS 10000
 #define PARALLEL 1
-#define EXACT_RESOLUTION 1
+#define EXACT_RESOLUTION 0
 double time_diff(struct timeval tv1, struct timeval tv2)
 {
     return (((double)tv2.tv_sec*(double)1000 +(double)tv2.tv_usec/(double)1000) - ((double)tv1.tv_sec*(double)1000 + (double)tv1.tv_usec/(double)1000));

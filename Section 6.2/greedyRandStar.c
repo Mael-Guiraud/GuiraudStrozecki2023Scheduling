@@ -11,12 +11,12 @@ All rights reserved.
 
 #include<sys/time.h>
 
-#define PERIODE 100
-#define NB_ROUTES 100
-#define TAILLE_ROUTES 100
+#define PERIODE 10
+#define NB_ROUTES 10
+#define TAILLE_ROUTES 10 //Same as period
 #define NB_SIMUL 1000
-#define EXACT_RESOLUTION 0 //Set to 1 to run the FPT algorithm
-#define FIG18 1 // set to 1 if you want to recreate the file time.data for figure 18
+#define EXACT_RESOLUTION 1 //Set to 1 to run the FPT algorithm
+#define FIG18 0 // set to 1 if you want to recreate the file time.data for figure 18
 #define DEBUG 0
 
 double time_diff(struct timeval tv1, struct timeval tv2)
@@ -804,7 +804,7 @@ int main()
 		printf("OK\n");
 		running_time[i]=0.0;
 	}
-	int nb_routes_start = FIG18?5:NB_ROUTES;
+	int nb_routes_start = FIG18?5:1;
 	for(int i=nb_routes_start;i<=NB_ROUTES;i++)
 	{
 		for(int j=0;j<nb_algos;j++)
